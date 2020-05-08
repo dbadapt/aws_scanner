@@ -1,2 +1,2 @@
 __pycache__
-ssh-agent bash -c "ssh-add /home/dbennett/.ssh/github_dbadapt; git $*"
+git.sh
