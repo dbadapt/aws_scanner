@@ -34,7 +34,7 @@ def main():
             help='Ending port to scan (default: %(default)s)')
     parser.add_argument('-j','--jobs', nargs=1, default=1, type=int,
             help='Number of concurrent port scanning jobs (default: %(default)s)')
-    parser.add_argument('-t','--timeout', nargs=1, type=int, default=5,
+    parser.add_argument('-t','--timeout', nargs=1, default=[5], type=int,
             help='Timeout in seconds waiting for port to answer (default: %(default)s)')
 
     args = parser.parse_args()
@@ -102,7 +102,7 @@ AWS instance port scan by Region and Availability Zone
                     scanner.start_port = args.start_port[0]
                     scanner.end_port = args.end_port[0]
                     scanner.threads = args.jobs[0]
-                    scanner.timeout = args.timeout
+                    scanner.timeout = args.timeout[0]
                     ports = scanner.scan()
 
                     if len(ports) > 0:
