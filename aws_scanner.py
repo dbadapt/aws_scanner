@@ -15,22 +15,31 @@ import sys
 import argparse
 import boto3
 from spinner import Spinner
+from scanner import PortScanner
 
-
+# display specific tag value from tag array
 def tag_value(tag_array, key):
     for tag in tag_array:
         if tag['Key'] == key:
             return tag['Value']
 
 def main():
+
     parser = argparse.ArgumentParser(description='Scan AWS instances for open ports')
-    parser.add_argument('--region-prefixes', nargs='*', type=str,
+    parser.add_argument('-r','--region-prefixes', nargs='*', type=str,
             help='A list of region prefixes to limit the search to')
+    parser.add_argument('-s','--start-port', nargs=1, default=0, type=int,
+            help='Starting port to scan (default: %(default)s)')
+    parser.add_argument('-e','--end-port', nargs=1, default=1023, type=int,
+            help='Ending port to scan (default: %(default)s)')
+    parser.add_argument('-j','--jobs', nargs=1, default=1, type=int,
+            help='Number of concurrent port scanning jobs (default: %(default)s)')
+    parser.add_argument('-t','--timeout', nargs=1, type=int, default=5,
+            help='Timeout in seconds waiting for port to answer (default: %(default)s)')
 
     args = parser.parse_args()
 
     spinner = Spinner() 
-
 
     ec2_client = boto3.client('ec2')
 
@@ -78,14 +87,29 @@ AWS instance port scan by Region and Availability Zone
                     spinner.clear()
 
                     if not region_printed:
-                        sys.stdout.write("Region: "+region_name+"\n")
+                        print("Region: "+region_name)
                         region_printed = True
 
                     if not zone_printed:
-                        sys.stdout.write("\tZone: "+zone_name+"\n")
+                        print("\tZone: "+zone_name)
                         zone_printed = True
 
-                    sys.stdout.write("\t\t" + instance.id + "\t" + tag_value(instance.tags,'Name')+"\n")
+                    print("\t\t" + instance.id + "\t" + tag_value(instance.tags,'Name'))
+                    print("\t\tIP Address:" + instance.public_ip_address);
+
+                    scanner = PortScanner()
+                    scanner.target = instance.public_ip_address
+                    scanner.start_port = args.start_port[0]
+                    scanner.end_port = args.end_port[0]
+                    scanner.threads = args.jobs[0]
+                    scanner.timeout = args.timeout
+                    ports = scanner.scan()
+
+                    if len(ports) > 0:
+                        for port in ports:
+                            print("\t\t\tPort: "+str(port['Port'])+"\t"+"Service: "+port['Service'])
+                    else:
+                        print("\t\t\tNo open ports detected")
 
     spinner.clear()
     return(0)
