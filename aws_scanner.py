@@ -17,40 +17,58 @@ import boto3
 from spinner import Spinner
 from scanner import PortScanner
 
+# globals
+region_headers = []
+zone_headers = []
+spinner = Spinner() 
+
+# process command line arguments
+parser = argparse.ArgumentParser(description='Scan AWS instances for open ports')
+parser.add_argument('-r','--region-prefixes', nargs='*', type=str,
+        help='A list of region prefixes to limit the search to')
+parser.add_argument('-s','--start-port', nargs=1, default=0, type=int,
+        help='Starting port to scan (default: %(default)s)')
+parser.add_argument('-e','--end-port', nargs=1, default=1023, type=int,
+        help='Ending port to scan (default: %(default)s)')
+parser.add_argument('-j','--jobs', nargs=1, default=1, type=int,
+        help='Number of concurrent port scanning jobs (default: %(default)s)')
+parser.add_argument('-t','--timeout', nargs=1, default=[5], type=int,
+        help='Timeout in seconds waiting for port to answer (default: %(default)s)')
+
+args = parser.parse_args()
+
 # display specific tag value from tag array
+#
 def tag_value(tag_array, key):
+    """ 
+    Return an AWS tag value   
+  
+    Parameters: 
+    tag_array (array): Array of AWS tags
+  
+    Returns: 
+    string: Tag value
+ 
+    """
     for tag in tag_array:
         if tag['Key'] == key:
             return tag['Value']
 
-def main():
 
-    parser = argparse.ArgumentParser(description='Scan AWS instances for open ports')
-    parser.add_argument('-r','--region-prefixes', nargs='*', type=str,
-            help='A list of region prefixes to limit the search to')
-    parser.add_argument('-s','--start-port', nargs=1, default=0, type=int,
-            help='Starting port to scan (default: %(default)s)')
-    parser.add_argument('-e','--end-port', nargs=1, default=1023, type=int,
-            help='Ending port to scan (default: %(default)s)')
-    parser.add_argument('-j','--jobs', nargs=1, default=1, type=int,
-            help='Number of concurrent port scanning jobs (default: %(default)s)')
-    parser.add_argument('-t','--timeout', nargs=1, default=[5], type=int,
-            help='Timeout in seconds waiting for port to answer (default: %(default)s)')
-
-    args = parser.parse_args()
-
-    spinner = Spinner() 
-
-    ec2_client = boto3.client('ec2')
-
-    region_list = ec2_client.describe_regions()
-
-    print("""
-AWS instance port scan by Region and Availability Zone
-------------------------------------------------------
-    """)
+def process_regions(region_list):
+    """ 
+    Process AWS regions 
+  
+    This function will process the AWS regions
+  
+    Parameters: 
+    region_list (array): Region list described by boto3 
+				EC2 client.describe_regions()
+    """    
 
     for region in region_list['Regions']:
+
+        spinner.update()
 
         region_name = region['RegionName']
 
@@ -63,57 +81,105 @@ AWS instance port scan by Region and Availability Zone
             if not good_region:
                 continue
 
-        region_printed = False
+        region_client = boto3.client('ec2', region_name=region_name)
+
+        process_zones(region_name, boto3.resource('ec2', region_name=region_name), region_client.describe_availability_zones())
+
+def process_zones(region_name, region_resource, zone_list):
+    """ 
+    Process availability zones for an AWS region 
+  
+    Parameters: 
+    region_name (str): The AWS region name (ex. us-west-1)
+    region_resource (obj): The boto3 region resource
+    zone_list (array): zone_list returned by boto3 describe_availability_zones()
+    
+    """
+
+    for zone in zone_list['AvailabilityZones']:
 
         spinner.update()
 
-        region_client = boto3.client('ec2', region_name=region_name)
+        process_instances(region_name, zone['ZoneName'], region_resource.instances.all())
 
-        region_resource = boto3.resource('ec2', region_name=region_name)
+def process_instances(region_name, zone_name, instances):
+    """ 
+    Process instances within an AWS region and availability zone
+  
+    Parameters: 
+    region_name (str): The AWS region name (ex. us-west-1)
+    zone_name (str): The AWS availability zone name
+    instances (array): An array of instances within the availability zone
+  
+    """
+    for instance in instances: 
 
-        zone_list = region_client.describe_availability_zones()
+        if (zone_name == instance.placement['AvailabilityZone']):
 
-        for zone in zone_list['AvailabilityZones']:
+            spinner.clear()
 
-            spinner.update()
+            if region_name not in region_headers:
+                print("Region: "+region_name)
+                region_headers.append(region_name)
 
-            zone_printed = False
-            zone_name = zone['ZoneName']
-        
-            for instance in region_resource.instances.all():
+            if zone_name not in zone_headers:
+                print("\tZone: "+zone_name)
+                zone_headers.append(zone_name)
 
-                if (zone_name == instance.placement['AvailabilityZone']):
+            print("\t\t" + instance.id + "\t" + tag_value(instance.tags,'Name'))
+            print("\t\tIP Address:" + instance.public_ip_address);
 
-                    spinner.clear()
+            scan_instance(instance)
 
-                    if not region_printed:
-                        print("Region: "+region_name)
-                        region_printed = True
+def scan_instance(instance):            
+    """ 
+    Port scan instance and report ports
+  
+    This function will portscan the specified instance given the parameters
+    on the command line.  See the PortScanner class in scanner.py for more info
+  
+    Parameters: 
+    instance (obj): instance object returned by boto3
+  
+    Returns: 
+    int: Description of return value region resource
+  
+    """
+    scanner = PortScanner()
+    scanner.target = instance.public_ip_address
+    scanner.start_port = args.start_port[0]
+    scanner.end_port = args.end_port[0]
+    scanner.threads = args.jobs[0]
+    scanner.timeout = args.timeout[0]
+    ports = scanner.scan()
 
-                    if not zone_printed:
-                        print("\tZone: "+zone_name)
-                        zone_printed = True
+    if len(ports) > 0:
+        for port in ports:
+            print("\t\t\tPort: "+str(port['Port'])+"\t"+"Service: "+port['Service'])
+    else:
+        print("\t\t\tNo open ports detected")
 
-                    print("\t\t" + instance.id + "\t" + tag_value(instance.tags,'Name'))
-                    print("\t\tIP Address:" + instance.public_ip_address);
+def main():
+    """ 
+    This is the main function
 
-                    scanner = PortScanner()
-                    scanner.target = instance.public_ip_address
-                    scanner.start_port = args.start_port[0]
-                    scanner.end_port = args.end_port[0]
-                    scanner.threads = args.jobs[0]
-                    scanner.timeout = args.timeout[0]
-                    ports = scanner.scan()
+    """
 
-                    if len(ports) > 0:
-                        for port in ports:
-                            print("\t\t\tPort: "+str(port['Port'])+"\t"+"Service: "+port['Service'])
-                    else:
-                        print("\t\t\tNo open ports detected")
+    print("""
+AWS instance port scan by Region and Availability Zone
+------------------------------------------------------
+""")
+
+    ec2_client = boto3.client('ec2')
+
+    process_regions(ec2_client.describe_regions());
 
     spinner.clear()
     return(0)
 
+# kick off the main function trapping keyboard cancelation
+# to avoid printed stacktrace to screen
+#
 try:
     ret=main()
     sys.exit(ret)
