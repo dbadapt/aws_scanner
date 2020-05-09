@@ -85,6 +85,7 @@ def process_regions(region_list):
 
         process_zones(region_name, boto3.resource('ec2', region_name=region_name), region_client.describe_availability_zones())
 
+
 def process_zones(region_name, region_resource, zone_list):
     """ 
     Process availability zones for an AWS region 
@@ -101,6 +102,7 @@ def process_zones(region_name, region_resource, zone_list):
         spinner.update()
 
         process_instances(region_name, zone['ZoneName'], region_resource.instances.all())
+
 
 def process_instances(region_name, zone_name, instances):
     """ 
@@ -131,6 +133,7 @@ def process_instances(region_name, zone_name, instances):
 
             scan_instance(instance)
 
+
 def scan_instance(instance):            
     """ 
     Port scan instance and report ports
@@ -159,6 +162,7 @@ def scan_instance(instance):
     else:
         print("\t\t\tNo open ports detected")
 
+
 def main():
     """ 
     This is the main function
@@ -176,6 +180,7 @@ AWS instance port scan by Region and Availability Zone
 
     spinner.clear()
     return(0)
+
 
 # kick off the main function trapping keyboard cancelation
 # to avoid printed stacktrace to screen
