@@ -6,7 +6,9 @@
 # portscanner = PortScanner()
 # portscanner.target = '127.0.0.1'
 # portscanner.start_port = 0
-# portscanner.end_port = 1024
+# portscanner.end_port = 1023
+# portscanner.timeout = 1
+# portscanner.threads = 4
 # port_array = portscanner.scan()
 #
 # Returns:
@@ -21,10 +23,35 @@ import socket
 from spinner import Spinner
 
 class PortScanner(object):
+    """
+    This class implments a multi-threaded port scanner in Python
 
+    This is a simple portscanner that attempts to open a TCP connection
+    on an IP address.   If the connection attempt is successful then the
+    port scan is successful.
+
+
+    Attributes
+    ----------
+    target : str
+        IP address or hostname to be scanned (default is 127.0.0.1)
+    start_port : int
+        the start of the port range from 0-65535 to scan (default is 0)
+    end_port  : int
+        the end of the port range from 0-65535 to scan (default is 1023)
+    threads : int
+        the number of simultaneous port scanning threads to start (default is 1)
+    timeout : int
+        timeout in seconds when trying to open a connection on a port (default is 5)
+
+    Methods
+    -------
+    scan()
+        Perform the port scan
+    """
     target = "127.0.0.1" 
     start_port = 0
-    end_port = 1024
+    end_port = 1023
     result = []
     threads = 1
     timeout = 5
@@ -56,6 +83,7 @@ class PortScanner(object):
         except:
             pass
 
+    # the main thread method
     def __make_thread(s):
         while not s.terminate:
             port=s.__tq.get()
@@ -63,7 +91,7 @@ class PortScanner(object):
                 s.__scan_port(port)
             s.__tq.task_done()
 
-            
+    # this is the public scan() method
     def scan(s):
         s.result=[]
         s.__tq = Queue()
