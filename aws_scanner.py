@@ -26,11 +26,11 @@ spinner = Spinner()
 parser = argparse.ArgumentParser(description='Scan AWS instances for open ports')
 parser.add_argument('-r','--region-prefixes', nargs='*', type=str,
         help='A list of region prefixes to limit the search to')
-parser.add_argument('-s','--start-port', nargs=1, default=0, type=int,
+parser.add_argument('-s','--start-port', nargs=1, default=[0], type=int,
         help='Starting port to scan (default: %(default)s)')
-parser.add_argument('-e','--end-port', nargs=1, default=1023, type=int,
+parser.add_argument('-e','--end-port', nargs=1, default=[1023], type=int,
         help='Ending port to scan (default: %(default)s)')
-parser.add_argument('-j','--jobs', nargs=1, default=1, type=int,
+parser.add_argument('-j','--jobs', nargs=1, default=[1], type=int,
         help='Number of concurrent port scanning jobs (default: %(default)s)')
 parser.add_argument('-t','--timeout', nargs=1, default=[5], type=int,
         help='Timeout in seconds waiting for port to answer (default: %(default)s)')
