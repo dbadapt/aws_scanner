@@ -18,6 +18,7 @@ import threading
 from queue import Queue
 import time
 import socket
+from spinner import Spinner
 
 class PortScanner(object):
 
@@ -29,8 +30,10 @@ class PortScanner(object):
     timeout = 5
     terminate = False
     __tq = None
+    __spinner = Spinner()
 
     __array_mutex = threading.Lock()
+    __spin_mutex = threading.Lock()
 
     def result_contains_port(s,port):
         for r in s.result:
@@ -43,6 +46,8 @@ class PortScanner(object):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(s.timeout)
         try:
+            with s.__spin_mutex:
+                s.__spinner.update()
             con = sock.connect((s.target, port))
             element = {'Port':port, 'Service':socket.getservbyport(port)}
             with s.__array_mutex:
@@ -78,5 +83,6 @@ class PortScanner(object):
         s.__tq.join()
         for t in threads:
             t.join()
+        s.__spinner.clear()
         return(s.result)
 
