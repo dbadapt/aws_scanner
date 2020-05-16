@@ -1,7 +1,7 @@
 # python class: Spinner
 # Author: David Bennett - dbadapt@gmail.com
 #
-# display spinner on tty to the user knows something is
+# display spinner on tty so the user knows something is
 # happening.
 #
 # Usage:

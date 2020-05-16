@@ -24,9 +24,9 @@ from spinner import Spinner
 
 class PortScanner(object):
     """
-    This class implments a multi-threaded port scanner in Python
+    This class implements a multi-threaded port scanner in Python
 
-    This is a simple portscanner that attempts to open a TCP connection
+    This is a simple port scanner that attempts to open a TCP connection
     on an IP address.   If the connection attempt is successful then the
     port scan is successful.
 
