@@ -55,7 +55,7 @@ class PortScanner(object):
     result = []
     threads = 1
     timeout = 5
-    terminate = False
+    __terminate = False
     __tq = None
     __spinner = Spinner()
 
@@ -73,8 +73,6 @@ class PortScanner(object):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(s.timeout)
         try:
-            with s.__spin_mutex:
-                s.__spinner.update()
             con = sock.connect((s.target, port))
             element = {'Port':port, 'Service':socket.getservbyport(port)}
             with s.__array_mutex:
@@ -85,31 +83,44 @@ class PortScanner(object):
 
     # the main thread method
     def __make_thread(s):
-        while not s.terminate:
+        while not s.__terminate:
             port=s.__tq.get()
             if port >= 0:
                 s.__scan_port(port)
             s.__tq.task_done()
 
+    # spinner thread
+    def __spinner_thread(s):
+        while not s.__terminate:
+            with s.__spin_mutex:
+                s.__spinner.update()
+            time.sleep(0.2)
+
     # this is the public scan() method
     def scan(s):
         s.result=[]
         s.__tq = Queue()
-        threads = []
+        active_threads = []
         for i in range(s.threads):
             thread = threading.Thread(target=s.__make_thread)
             thread.daemon = True
             thread.start()
-            threads.append(thread)
+            active_threads.append(thread)
         for port in range(s.start_port, s.end_port+1):
             s.__tq.put(port)
+        # spinner thread
+        spinner_thread = threading.Thread(target=s.__spinner_thread)
+        spinner_thread.daemon = True
+        spinner_thread.start()
+        active_threads.append(spinner_thread)
+        # wait for all items in queue to be processed
         s.__tq.join()
         # terminate threads
-        s.terminate = True
+        s.__terminate = True
         for i in range(s.threads):
             s.__tq.put(-1)
         s.__tq.join()
-        for t in threads:
+        for t in active_threads:
             t.join()
         s.__spinner.clear()
         return(s.result)
