@@ -182,8 +182,8 @@ AWS instance port scan by Region and Availability Zone
     return(0)
 
 
-# kick off the main function trapping keyboard cancelation
-# to avoid printed stacktrace to screen
+# kick off the main function trapping keyboard cancellation
+# to avoid printed stack trace to screen
 #
 try:
     ret=main()
